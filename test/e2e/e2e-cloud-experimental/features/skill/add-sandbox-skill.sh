@@ -9,18 +9,18 @@
 #     SKILL_ID=demo-skill \
 #     SKILL_DESCRIPTION="Demo skill from e2e helper" \
 #     SKILL_BODY="## Demo\nThis is a smoke skill." \
-#     bash test/e2e/e2e-cloud-experimental/add-sandbox-skill.sh
+#     bash test/e2e/e2e-cloud-experimental/features/skill/add-sandbox-skill.sh
 #
 #   SANDBOX_NAME=e2e-cloud-experimental \
 #     SKILL_ID=demo-skill \
 #     SKILL_FILE=/absolute/path/to/SKILL.md \
-#     bash test/e2e/e2e-cloud-experimental/add-sandbox-skill.sh
+#     bash test/e2e/e2e-cloud-experimental/features/skill/add-sandbox-skill.sh
 #
 # If SKILL_FILE / SKILL_BODY are omitted, script renders a template file:
 #   test/e2e/e2e-cloud-experimental/fixtures/skill-smoke-template.SKILL.md
 #
 # After deploy, optional: run one agent turn to prove the skill is used:
-#   NVIDIA_API_KEY=nvapi-... SANDBOX_NAME=... SKILL_ID=... bash test/e2e/e2e-cloud-experimental/verify-sandbox-skill-via-agent.sh
+#   NVIDIA_API_KEY=nvapi-... SANDBOX_NAME=... SKILL_ID=... bash test/e2e/e2e-cloud-experimental/features/skill/verify-sandbox-skill-via-agent.sh
 #
 # Exit code:
 #   0 = add + query succeeded

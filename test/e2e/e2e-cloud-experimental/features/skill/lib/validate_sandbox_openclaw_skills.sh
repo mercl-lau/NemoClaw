@@ -7,7 +7,7 @@
 # - /sandbox/.openclaw/skills is optional (host snapshot may omit it); prints status for the caller.
 #
 # Usage:
-#   SANDBOX_NAME=my-sbx bash test/e2e/e2e-cloud-experimental/lib/validate_sandbox_openclaw_skills.sh
+#   SANDBOX_NAME=my-sbx bash test/e2e/e2e-cloud-experimental/features/skill/lib/validate_sandbox_openclaw_skills.sh
 # Exit:
 #   0 — state dir + config OK (stdout: SKILLS_SUBDIR=present|absent)
 #   1 — ssh/openshell failure or missing required paths

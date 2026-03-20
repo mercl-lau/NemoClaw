@@ -1,12 +1,12 @@
 # e2e-cloud-experimental — sandbox case suite
 
-Case scripts run **after** Phase 3 (install + onboard). The main script runs every **`cases/*.sh`** in sorted order, then **Phase 5b** POSTs **`/v1/chat/completions`** on `https://inference.local` from inside the sandbox and expects **PONG** (model = `CLOUD_EXPERIMENTAL_MODEL`; host needs **`python3`** to parse JSON). **Phase 5c** validates **`.agents/skills/*/SKILL.md`** on the repo checkout and checks **`/sandbox/.openclaw`** (and **`openclaw.json`**) inside the sandbox over SSH; if the migrated snapshot had no host skills directory, **`/sandbox/.openclaw/skills`** may be missing — the suite records an honest **SKIP** for that sub-check (not a PASS). **Phase 5d** injects `skill-smoke-fixture` into the sandbox and runs one `openclaw agent` turn that must return token `SKILL_SMOKE_VERIFY_K9X2` from that skill file. **Phase 6** is final cleanup. Set `RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_FINAL_CLEANUP=1` (legacy: `RUN_SCENARIO_A_SKIP_FINAL_CLEANUP=1`) to leave the sandbox up for debugging.
+Case scripts run **after** Phase 3 (install + onboard). The main script runs every **`checks/*.sh`** in sorted order, then **Phase 5b** POSTs **`/v1/chat/completions`** on `https://inference.local` from inside the sandbox and expects **PONG** (model = `CLOUD_EXPERIMENTAL_MODEL`; host needs **`python3`** to parse JSON). **Phase 5c** validates **`.agents/skills/*/SKILL.md`** on the repo checkout and checks **`/sandbox/.openclaw`** (and **`openclaw.json`**) inside the sandbox over SSH; if the migrated snapshot had no host skills directory, **`/sandbox/.openclaw/skills`** may be missing — the suite records an honest **SKIP** for that sub-check (not a PASS). **Phase 5d** injects `skill-smoke-fixture` into the sandbox and runs one `openclaw agent` turn that must return token `SKILL_SMOKE_VERIFY_K9X2` from that skill file. **Phase 6** is final cleanup. Set `RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_FINAL_CLEANUP=1` (legacy: `RUN_SCENARIO_A_SKIP_FINAL_CLEANUP=1`) to leave the sandbox up for debugging.
 
-To run the inject + dialogue verification directly: **`NVIDIA_API_KEY=nvapi-... SANDBOX_NAME=... SKILL_ID=skill-smoke-fixture bash test/e2e/e2e-cloud-experimental/verify-sandbox-skill-via-agent.sh`** (after `test/e2e/e2e-cloud-experimental/add-sandbox-skill.sh`).
+To run the inject + dialogue verification directly: **`NVIDIA_API_KEY=nvapi-... SANDBOX_NAME=... SKILL_ID=skill-smoke-fixture bash test/e2e/e2e-cloud-experimental/features/skill/verify-sandbox-skill-via-agent.sh`** (after `test/e2e/e2e-cloud-experimental/features/skill/add-sandbox-skill.sh`).
 
 Scripts under **`skip/`** are **not** executed by the main suite — run them manually when you want those checks (e.g. flaky network policy / egress).
 
-## Cases (`cases/`, sorted by filename)
+## Ready checks (`ready/`, sorted by filename)
 
 | Script | What it checks |
 |--------|----------------|
@@ -27,7 +27,7 @@ Run manually after onboard, from repo root:
 bash test/e2e/e2e-cloud-experimental/skip/05-network-policy.sh
 ```
 
-Same env defaults as cases (`SANDBOX_NAME`, `CLOUD_EXPERIMENTAL_MODEL`, etc.). Optional: `E2E_CLOUD_EXPERIMENTAL_EGRESS_BLOCKED_URL` if `example.com` is allowlisted.
+Same env defaults as ready checks (`SANDBOX_NAME`, `CLOUD_EXPERIMENTAL_MODEL`, etc.). Optional: `E2E_CLOUD_EXPERIMENTAL_EGRESS_BLOCKED_URL` if `example.com` is allowlisted.
 
 ## Contract
 
@@ -38,7 +38,7 @@ Same env defaults as cases (`SANDBOX_NAME`, `CLOUD_EXPERIMENTAL_MODEL`, etc.). O
 
 ## Adding a case
 
-1. Add `cases/NN-your-check.sh` (next sort order)
+1. Add `checks/NN-your-check.sh` (next sort order)
 2. Do not edit `test-e2e-cloud-experimental.sh` unless you need new env vars — then export them in Phase 3/5 handoff in the main script
 
 ## Running a single case
@@ -46,7 +46,7 @@ Same env defaults as cases (`SANDBOX_NAME`, `CLOUD_EXPERIMENTAL_MODEL`, etc.). O
 After a successful onboard on this machine, from repo root:
 
 ```bash
-bash test/e2e/e2e-cloud-experimental/cases/01-onboard-completion.sh
+bash test/e2e/e2e-cloud-experimental/checks/01-onboard-completion.sh
 ```
 
 `02-inference-local-http.sh` only needs `SANDBOX_NAME` / `NEMOCLAW_SANDBOX_NAME` (default `e2e-cloud-experimental`).
@@ -60,7 +60,7 @@ bash test/e2e/e2e-cloud-experimental/cases/01-onboard-completion.sh
 ```bash
 export SANDBOX_NAME=my-sandbox
 export CLOUD_EXPERIMENTAL_MODEL=nvidia/nemotron-3-super-120b-a12b   # must appear in: openshell inference get
-bash test/e2e/e2e-cloud-experimental/cases/01-onboard-completion.sh
+bash test/e2e/e2e-cloud-experimental/checks/01-onboard-completion.sh
 ```
 
 (Legacy env names `SCENARIO_A_MODEL` / `NEMOCLAW_SCENARIO_A_MODEL` still work in case defaults.)

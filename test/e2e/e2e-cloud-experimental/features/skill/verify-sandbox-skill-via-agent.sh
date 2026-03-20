@@ -10,7 +10,7 @@
 #
 # Usage (from repo root):
 #   NVIDIA_API_KEY=nvapi-... SANDBOX_NAME=test01 SKILL_ID=skill-smoke-fixture \
-#     bash test/e2e/e2e-cloud-experimental/verify-sandbox-skill-via-agent.sh
+#     bash test/e2e/e2e-cloud-experimental/features/skill/verify-sandbox-skill-via-agent.sh
 #
 # Optional:
 #   SKILL_VERIFY_PROMPT — override user message (still must elicit VERIFY_TOKEN in practice)
@@ -80,4 +80,4 @@ if printf '%s' "$raw_out" | grep -Fq "$VERIFY_TOKEN"; then
   exit 0
 fi
 
-die "token ${VERIFY_TOKEN} not found in agent output (ssh/agent exit ${agent_rc}). Re-deploy skill: bash test/e2e/e2e-cloud-experimental/add-sandbox-skill.sh with same SANDBOX_NAME and SKILL_ID."
+die "token ${VERIFY_TOKEN} not found in agent output (ssh/agent exit ${agent_rc}). Re-deploy skill: bash test/e2e/e2e-cloud-experimental/features/skill/add-sandbox-skill.sh with same SANDBOX_NAME and SKILL_ID."

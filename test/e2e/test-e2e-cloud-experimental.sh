@@ -2,9 +2,9 @@
 # e2e-cloud-experimental — Ubuntu + Docker CE + experimental mode + Cloud API
 #
 # Focus: experimental / policy / network / security (VDR3 + internal bugs).
-# Implemented: Phase 0–1, 3, 5–6. Phase 5 runs cases/*.sh; Phase 5b live chat; Phase 5c skill smoke; Phase 5d skill agent verification; Phase 6 final cleanup.
-# (add cases under e2e-cloud-experimental/cases without editing case loop). VDR3 #12 via env on Phase 3 install.
-# Phase 2 skipped. Phase 5: case suite (cases/*.sh only; opt-in scripts live under e2e-cloud-experimental/skip/).
+# Implemented: Phase 0–1, 3, 5–6. Phase 5 runs checks/*.sh; Phase 5b live chat; Phase 5c skill smoke; Phase 5d skill agent verification; Phase 6 final cleanup.
+# (add checks under e2e-cloud-experimental/checks without editing case loop). VDR3 #12 via env on Phase 3 install.
+# Phase 2 skipped. Phase 5: checks suite (checks/*.sh only; opt-in scripts live under e2e-cloud-experimental/skip/).
 # Phase 5b: POST /v1/chat/completions inside sandbox (model = CLOUD_EXPERIMENTAL_MODEL).
 # Phase 5c: validate repo .agents/skills; verify /sandbox/.openclaw inside sandbox (skills subdir optional → SKIP if absent).
 # Phase 5d: inject skill-smoke-fixture into sandbox and verify token via openclaw agent.
@@ -76,7 +76,7 @@ fi
 SANDBOX_NAME="e2e-cloud-experimental"
 CLOUD_EXPERIMENTAL_MODEL="${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}"
 E2E_DIR="$(cd "$(dirname "$0")" && pwd)"
-E2E_CLOUD_EXPERIMENTAL_CASES_DIR="${E2E_DIR}/e2e-cloud-experimental/cases"
+E2E_CLOUD_EXPERIMENTAL_READY_DIR="${E2E_DIR}/e2e-cloud-experimental/checks"
 
 # ══════════════════════════════════════════════════════════════════════
 # Phase 0: Pre-cleanup
@@ -225,21 +225,21 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# Phase 5: Sandbox case suite (test/e2e/e2e-cloud-experimental/cases/*.sh)
+# Phase 5: Sandbox checks suite (test/e2e/e2e-cloud-experimental/checks/*.sh)
 # ══════════════════════════════════════════════════════════════════════
-# Case scripts are sorted by filename; each must exit 0 on success. See e2e-cloud-experimental/README.md.
-section "Phase 5: Sandbox case suite (then Phase 5b chat + Phase 5c skill smoke in this script)"
+# Ready scripts are sorted by filename; each must exit 0 on success. See e2e-cloud-experimental/README.md.
+section "Phase 5: Sandbox checks suite (then Phase 5b chat + Phase 5c skill smoke in this script)"
 
 export SANDBOX_NAME CLOUD_EXPERIMENTAL_MODEL REPO NVIDIA_API_KEY
 
 shopt -s nullglob
-case_scripts=( "$E2E_CLOUD_EXPERIMENTAL_CASES_DIR"/*.sh )
+case_scripts=( "$E2E_CLOUD_EXPERIMENTAL_READY_DIR"/*.sh )
 shopt -u nullglob
 
 if [ "${#case_scripts[@]}" -eq 0 ]; then
-  skip "No case scripts in ${E2E_CLOUD_EXPERIMENTAL_CASES_DIR} (add cases/*.sh)"
+  skip "No checks scripts in ${E2E_CLOUD_EXPERIMENTAL_READY_DIR} (add checks/*.sh)"
 else
-  info "Case directory: ${E2E_CLOUD_EXPERIMENTAL_CASES_DIR} (${#case_scripts[@]} script(s))"
+  info "Checks directory: ${E2E_CLOUD_EXPERIMENTAL_READY_DIR} (${#case_scripts[@]} script(s))"
   for case_script in "${case_scripts[@]}"; do
     info "Running $(basename "$case_script")..."
     set +e
@@ -325,8 +325,8 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # Phase 5c: Skill smoke (repo Cursor skills + sandbox OpenClaw layout)
 # ══════════════════════════════════════════════════════════════════════
-# Repo: test/e2e/e2e-cloud-experimental/lib/validate_repo_skills.py — every .agents/skills/*/SKILL.md
-# Sandbox: test/e2e/e2e-cloud-experimental/lib/validate_sandbox_openclaw_skills.sh — /sandbox/.openclaw + openclaw.json;
+# Repo: test/e2e/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.py — every .agents/skills/*/SKILL.md
+# Sandbox: test/e2e/e2e-cloud-experimental/features/skill/lib/validate_sandbox_openclaw_skills.sh — /sandbox/.openclaw + openclaw.json;
 #   skills subdir is optional (migration); absent → honest SKIP (not PASS).
 section "Phase 5c: Skill smoke (repo + sandbox OpenClaw)"
 
@@ -336,7 +336,7 @@ if ! command -v python3 > /dev/null 2>&1; then
 fi
 
 info "Validating repo .agents/skills (SKILL.md frontmatter + body)..."
-if ! python3 "$E2E_DIR/e2e-cloud-experimental/lib/validate_repo_skills.py" --repo "$REPO"; then
+if ! python3 "$E2E_DIR/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.py" --repo "$REPO"; then
   fail "Phase 5c: repo skill validation failed"
   exit 1
 fi
@@ -344,7 +344,7 @@ pass "Phase 5c: repo agent skills (SKILL.md) valid"
 
 info "Checking /sandbox/.openclaw inside sandbox..."
 set +e
-sb_out=$(SANDBOX_NAME="$SANDBOX_NAME" bash "$E2E_DIR/e2e-cloud-experimental/lib/validate_sandbox_openclaw_skills.sh" 2>/dev/null)
+sb_out=$(SANDBOX_NAME="$SANDBOX_NAME" bash "$E2E_DIR/e2e-cloud-experimental/features/skill/lib/validate_sandbox_openclaw_skills.sh" 2>/dev/null)
 sb_rc=$?
 set -euo pipefail
 
@@ -370,14 +370,14 @@ fi
 section "Phase 5d: Skill agent verification (inject + token)"
 
 info "Injecting skill-smoke-fixture into sandbox '${SANDBOX_NAME}'..."
-if ! SANDBOX_NAME="$SANDBOX_NAME" SKILL_ID="skill-smoke-fixture" bash "$E2E_DIR/e2e-cloud-experimental/add-sandbox-skill.sh"; then
+if ! SANDBOX_NAME="$SANDBOX_NAME" SKILL_ID="skill-smoke-fixture" bash "$E2E_DIR/e2e-cloud-experimental/features/skill/add-sandbox-skill.sh"; then
   fail "Phase 5d: failed to inject/query skill-smoke-fixture"
   exit 1
 fi
 pass "Phase 5d: skill-smoke-fixture injected and queryable"
 
 info "Running one openclaw agent turn to verify skill token..."
-if ! NVIDIA_API_KEY="$NVIDIA_API_KEY" SANDBOX_NAME="$SANDBOX_NAME" SKILL_ID="skill-smoke-fixture" bash "$E2E_DIR/e2e-cloud-experimental/verify-sandbox-skill-via-agent.sh"; then
+if ! NVIDIA_API_KEY="$NVIDIA_API_KEY" SANDBOX_NAME="$SANDBOX_NAME" SKILL_ID="skill-smoke-fixture" bash "$E2E_DIR/e2e-cloud-experimental/features/skill/verify-sandbox-skill-via-agent.sh"; then
   fail "Phase 5d: agent verification did not return skill token"
   exit 1
 fi
