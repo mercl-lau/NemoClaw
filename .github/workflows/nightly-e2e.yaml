@@ -50,6 +50,7 @@ jobs:
 
   cloud-experimental-e2e:
     runs-on: ubuntu-latest
+    environment: NVIDIA_API_KEY
     timeout-minutes: 45
     steps:
       - name: Checkout
