@@ -42,7 +42,14 @@ def parse_scalar(field: str, fm: str) -> str | None:
 
 def validate_skill_file(path: Path) -> list[str]:
     errs: list[str] = []
-    raw = path.read_text(encoding="utf-8")
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as e:
+        errs.append(f"cannot read file: {e}")
+        return errs
+    except UnicodeDecodeError as e:
+        errs.append(f"not valid UTF-8: {e}")
+        return errs
     fm, body = split_frontmatter(raw)
     if fm is None:
         errs.append("missing or invalid YAML frontmatter (expected --- ... ---)")
