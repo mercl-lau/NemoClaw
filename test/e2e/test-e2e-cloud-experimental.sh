@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # e2e-cloud-experimental — Ubuntu + Docker CE + experimental mode + Cloud API
 #
 # Focus: experimental / policy / network / security (VDR3 + internal bugs).
@@ -29,11 +32,13 @@
 #   NEMOCLAW_POLICY_PRESETS            — e.g. npm,pypi (github preset TBD in repo)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE=1 — optional: expect-based steps (later phases)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_FINAL_CLEANUP=1 — leave sandbox/gateway up (local debugging); legacy: RUN_SCENARIO_A_SKIP_FINAL_CLEANUP=1
+#   NEMOCLAW_INSTALL_SCRIPT_URL — optional override for Phase 3 curl URL (default: https://www.nvidia.com/nemoclaw.sh)
 #
 # Usage (Phases 0–1, 3 + cases + Phase 5b chat + Phase 5c skill smoke + Phase 5d skill verification + Phase 6 cleanup; Phase 2 skipped):
 #   NEMOCLAW_NON_INTERACTIVE=1 NVIDIA_API_KEY=nvapi-... bash test/e2e/test-e2e-cloud-experimental.sh
 #
-# CI equivalent to public curl | bash: run from repo root with install.sh (install does onboard).
+# Phase 3 uses the public installer: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+# (env below is exported before that run). Checkout root is still required for Phase 5c repo skills.
 
 set -uo pipefail
 
@@ -42,10 +47,25 @@ FAIL=0
 SKIP=0
 TOTAL=0
 
-pass() { ((PASS++)); ((TOTAL++)); printf '\033[32m  PASS: %s\033[0m\n' "$1"; }
-fail() { ((FAIL++)); ((TOTAL++)); printf '\033[31m  FAIL: %s\033[0m\n' "$1"; }
-skip() { ((SKIP++)); ((TOTAL++)); printf '\033[33m  SKIP: %s\033[0m\n' "$1"; }
-section() { echo ""; printf '\033[1;36m=== %s ===\033[0m\n' "$1"; }
+pass() {
+  ((PASS++))
+  ((TOTAL++))
+  printf '\033[32m  PASS: %s\033[0m\n' "$1"
+}
+fail() {
+  ((FAIL++))
+  ((TOTAL++))
+  printf '\033[31m  FAIL: %s\033[0m\n' "$1"
+}
+skip() {
+  ((SKIP++))
+  ((TOTAL++))
+  printf '\033[33m  SKIP: %s\033[0m\n' "$1"
+}
+section() {
+  echo ""
+  printf '\033[1;36m=== %s ===\033[0m\n' "$1"
+}
 info() { printf '\033[1;34m  [info]\033[0m %s\n' "$1"; }
 
 # Parse chat completion JSON — content, reasoning_content, or reasoning (e.g. moonshot/kimi via gateway)
@@ -63,15 +83,18 @@ except Exception as e:
 "
 }
 
-# ── Repo root (same logic as test-full-e2e.sh) ─────────────────────────
-if [ -d /workspace ] && [ -f /workspace/install.sh ]; then
+# ── Repo root (checkout; used for Phase 5c skill validation — not for Phase 3 install) ──
+_script_dir="$(cd "$(dirname "$0")" && pwd)"
+_candidate="$(cd "${_script_dir}/../.." && pwd)"
+if [ -d /workspace ] && [ -f /workspace/package.json ] && [ -d /workspace/test/e2e ]; then
   REPO="/workspace"
-elif [ -f "$(cd "$(dirname "$0")/../.." && pwd)/install.sh" ]; then
-  REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+elif [ -f "${_candidate}/package.json" ] && [ -d "${_candidate}/test/e2e" ]; then
+  REPO="${_candidate}"
 else
-  echo "ERROR: Cannot find repo root (install.sh)."
+  echo "ERROR: Cannot find repo root (expected package.json and test/e2e at checkout root)."
   exit 1
 fi
+unset _script_dir _candidate
 
 SANDBOX_NAME="e2e-cloud-experimental"
 CLOUD_EXPERIMENTAL_MODEL="${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}"
@@ -86,10 +109,10 @@ E2E_CLOUD_EXPERIMENTAL_READY_DIR="${E2E_DIR}/e2e-cloud-experimental/checks"
 section "Phase 0: Pre-cleanup"
 info "Destroying leftover sandbox, forwards, and gateway for '${SANDBOX_NAME}'..."
 
-if command -v nemoclaw > /dev/null 2>&1; then
+if command -v nemoclaw >/dev/null 2>&1; then
   nemoclaw "$SANDBOX_NAME" destroy 2>/dev/null || true
 fi
-if command -v openshell > /dev/null 2>&1; then
+if command -v openshell >/dev/null 2>&1; then
   openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
   openshell forward stop 18789 2>/dev/null || true
   openshell gateway destroy -g nemoclaw 2>/dev/null || true
@@ -104,7 +127,7 @@ pass "Pre-cleanup complete"
 # NEMOCLAW_NON_INTERACTIVE=1 for automated path; optional: assert Linux + Docker CE.
 section "Phase 1: Prerequisites"
 
-if docker info > /dev/null 2>&1; then
+if docker info >/dev/null 2>&1; then
   pass "Docker is running"
 else
   fail "Docker is not running — cannot continue"
@@ -118,7 +141,7 @@ else
   exit 1
 fi
 
-if curl -sf --max-time 10 https://integrate.api.nvidia.com/v1/models > /dev/null 2>&1; then
+if curl -sf --max-time 10 https://integrate.api.nvidia.com/v1/models >/dev/null 2>&1; then
   pass "Network access to integrate.api.nvidia.com"
 else
   fail "Cannot reach integrate.api.nvidia.com"
@@ -155,13 +178,15 @@ skip "Phase 2: doc review (VDR3 #11) — not required for now"
 # ══════════════════════════════════════════════════════════════════════
 # Phase 3: Install + PATH (VDR3 #7, #10)
 # ══════════════════════════════════════════════════════════════════════
-# Public path: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
-# CI / dev from checkout: bash install.sh --non-interactive (same installer logic).
-# VDR3 #12 (experimental + cloud + custom model): env is inherited by install.sh →
+# Install: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+# VDR3 #12 (experimental + cloud + custom model): env is inherited by the installer →
 # nemoclaw onboard — no second onboard pass needed.
 section "Phase 3: Install and PATH"
 
-cd "$REPO" || { fail "Could not cd to repo root: $REPO"; exit 1; }
+cd "$REPO" || {
+  fail "Could not cd to repo root: $REPO"
+  exit 1
+}
 
 export NEMOCLAW_SANDBOX_NAME="$SANDBOX_NAME"
 export NEMOCLAW_EXPERIMENTAL=1
@@ -170,13 +195,14 @@ export NEMOCLAW_MODEL="$CLOUD_EXPERIMENTAL_MODEL"
 export NEMOCLAW_POLICY_MODE="${NEMOCLAW_POLICY_MODE:-custom}"
 export NEMOCLAW_POLICY_PRESETS="${NEMOCLAW_POLICY_PRESETS:-npm,pypi}"
 
-info "Running install.sh --non-interactive (equivalent to curl|bash install path)..."
+NEMOCLAW_INSTALL_SCRIPT_URL="${NEMOCLAW_INSTALL_SCRIPT_URL:-https://www.nvidia.com/nemoclaw.sh}"
+info "Running: curl -fsSL ${NEMOCLAW_INSTALL_SCRIPT_URL} | bash"
 info "Onboard uses EXPERIMENTAL=1, PROVIDER=cloud, MODEL=${CLOUD_EXPERIMENTAL_MODEL} (override: NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL or legacy NEMOCLAW_SCENARIO_A_MODEL)."
 info "Policy: NEMOCLAW_POLICY_MODE=${NEMOCLAW_POLICY_MODE} NEMOCLAW_POLICY_PRESETS=${NEMOCLAW_POLICY_PRESETS} (override env to change)."
 info "Installs Node.js, openshell, NemoClaw, and runs onboard — may take several minutes."
 
 INSTALL_LOG="/tmp/nemoclaw-e2e-cloud-experimental-install.log"
-bash install.sh --non-interactive > "$INSTALL_LOG" 2>&1 &
+curl -fsSL "$NEMOCLAW_INSTALL_SCRIPT_URL" | bash >"$INSTALL_LOG" 2>&1 &
 install_pid=$!
 tail -f "$INSTALL_LOG" --pid=$install_pid 2>/dev/null &
 tail_pid=$!
@@ -197,27 +223,27 @@ if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
 fi
 
 if [ "$install_exit" -eq 0 ]; then
-  pass "install.sh --non-interactive completed (exit 0)"
+  pass "public install (curl nemoclaw.sh | bash) completed (exit 0)"
 else
-  fail "install.sh failed (exit $install_exit)"
+  fail "public install (curl nemoclaw.sh | bash) failed (exit $install_exit)"
   exit 1
 fi
 
-if command -v nemoclaw > /dev/null 2>&1; then
+if command -v nemoclaw >/dev/null 2>&1; then
   pass "nemoclaw on PATH ($(command -v nemoclaw))"
 else
   fail "nemoclaw not found on PATH after install"
   exit 1
 fi
 
-if command -v openshell > /dev/null 2>&1; then
+if command -v openshell >/dev/null 2>&1; then
   pass "openshell on PATH ($(openshell --version 2>&1 || echo unknown))"
 else
   fail "openshell not found on PATH after install"
   exit 1
 fi
 
-if nemoclaw --help > /dev/null 2>&1; then
+if nemoclaw --help >/dev/null 2>&1; then
   pass "nemoclaw --help exits 0"
 else
   fail "nemoclaw --help failed"
@@ -233,7 +259,7 @@ section "Phase 5: Sandbox checks suite (then Phase 5b chat + Phase 5c skill smok
 export SANDBOX_NAME CLOUD_EXPERIMENTAL_MODEL REPO NVIDIA_API_KEY
 
 shopt -s nullglob
-case_scripts=( "$E2E_CLOUD_EXPERIMENTAL_READY_DIR"/*.sh )
+case_scripts=("$E2E_CLOUD_EXPERIMENTAL_READY_DIR"/*.sh)
 shopt -u nullglob
 
 if [ "${#case_scripts[@]}" -eq 0 ]; then
@@ -261,7 +287,7 @@ fi
 # Same path as test-full-e2e.sh 4b: sandbox → gateway → cloud; model from CLOUD_EXPERIMENTAL_MODEL.
 section "Phase 5b: Live chat (inference.local /v1/chat/completions)"
 
-if ! command -v python3 > /dev/null 2>&1; then
+if ! command -v python3 >/dev/null 2>&1; then
   fail "Phase 5b: python3 not on PATH (needed to parse chat response)"
   exit 1
 fi
@@ -273,17 +299,20 @@ print(json.dumps({
     'messages': [{'role': 'user', 'content': 'Reply with exactly one word: PONG'}],
     'max_tokens': 100,
 }))
-") || { fail "Phase 5b: could not build chat JSON payload"; exit 1; }
+") || {
+  fail "Phase 5b: could not build chat JSON payload"
+  exit 1
+}
 
 info "POST chat completion inside sandbox (model ${CLOUD_EXPERIMENTAL_MODEL})..."
 
 CHAT_TIMEOUT_CMD=""
-command -v timeout > /dev/null 2>&1 && CHAT_TIMEOUT_CMD="timeout 120"
-command -v gtimeout > /dev/null 2>&1 && CHAT_TIMEOUT_CMD="gtimeout 120"
+command -v timeout >/dev/null 2>&1 && CHAT_TIMEOUT_CMD="timeout 120"
+command -v gtimeout >/dev/null 2>&1 && CHAT_TIMEOUT_CMD="gtimeout 120"
 
 ssh_config_chat="$(mktemp)"
 sandbox_chat_out=""
-if ! openshell sandbox ssh-config "$SANDBOX_NAME" > "$ssh_config_chat" 2>/dev/null; then
+if ! openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config_chat" 2>/dev/null; then
   rm -f "$ssh_config_chat"
   fail "Phase 5b: openshell sandbox ssh-config failed for '${SANDBOX_NAME}'"
   exit 1
@@ -298,10 +327,10 @@ sandbox_chat_out=$(
     -o LogLevel=ERROR \
     "openshell-${SANDBOX_NAME}" \
     "curl -sS --max-time 90 https://inference.local/v1/chat/completions -H 'Content-Type: application/json' -d $(printf '%q' "$payload")" \
-  2>&1
+    2>&1
 )
 chat_ssh_rc=$?
-set -euo pipefail
+set -uo pipefail
 rm -f "$ssh_config_chat"
 
 if [ "$chat_ssh_rc" -ne 0 ]; then
@@ -330,7 +359,7 @@ fi
 #   skills subdir is optional (migration); absent → honest SKIP (not PASS).
 section "Phase 5c: Skill smoke (repo + sandbox OpenClaw)"
 
-if ! command -v python3 > /dev/null 2>&1; then
+if ! command -v python3 >/dev/null 2>&1; then
   fail "Phase 5c: python3 not on PATH"
   exit 1
 fi
@@ -346,7 +375,7 @@ info "Checking /sandbox/.openclaw inside sandbox..."
 set +e
 sb_out=$(SANDBOX_NAME="$SANDBOX_NAME" bash "$E2E_DIR/e2e-cloud-experimental/features/skill/lib/validate_sandbox_openclaw_skills.sh" 2>/dev/null)
 sb_rc=$?
-set -euo pipefail
+set -uo pipefail
 
 if [ "$sb_rc" -ne 0 ]; then
   fail "Phase 5c: sandbox OpenClaw layout check failed (exit ${sb_rc}): ${sb_out:0:240}"
@@ -394,16 +423,16 @@ if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_FINAL_CLEANUP:-${RUN_SCENARIO_A_SKIP_FIN
 else
   info "Removing sandbox '${SANDBOX_NAME}', port forward, and nemoclaw gateway..."
 
-  if command -v nemoclaw > /dev/null 2>&1; then
+  if command -v nemoclaw >/dev/null 2>&1; then
     nemoclaw "$SANDBOX_NAME" destroy 2>/dev/null || true
   fi
-  if command -v openshell > /dev/null 2>&1; then
+  if command -v openshell >/dev/null 2>&1; then
     openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
     openshell forward stop 18789 2>/dev/null || true
     openshell gateway destroy -g nemoclaw 2>/dev/null || true
   fi
 
-  if command -v openshell > /dev/null 2>&1; then
+  if command -v openshell >/dev/null 2>&1; then
     if openshell sandbox get "$SANDBOX_NAME" >/dev/null 2>&1; then
       fail "openshell sandbox get '${SANDBOX_NAME}' still succeeds after cleanup"
       exit 1
@@ -413,7 +442,7 @@ else
     skip "openshell not on PATH — skipped sandbox get check after cleanup"
   fi
 
-  if command -v nemoclaw > /dev/null 2>&1; then
+  if command -v nemoclaw >/dev/null 2>&1; then
     set +e
     list_out=$(nemoclaw list 2>&1)
     list_rc=$?
