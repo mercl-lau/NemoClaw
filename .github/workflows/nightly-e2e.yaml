@@ -57,15 +57,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install expect (Phase 5e OpenClaw TUI smoke)
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends expect
-
       - name: Run cloud-experimental E2E test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
+          RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL: "0"
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_RECREATE_SANDBOX: "1"
+          NEMOCLAW_POLICY_MODE: "custom"
+          NEMOCLAW_POLICY_PRESETS: "npm,pypi"
         run: bash test/e2e/test-e2e-cloud-experimental.sh
 
       - name: Upload install log on failure
