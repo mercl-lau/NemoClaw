@@ -51,6 +51,7 @@ jobs:
   cloud-experimental-e2e:
     if: github.repository == 'NVIDIA/NemoClaw'
     runs-on: ubuntu-latest
+    environment: NVIDIA_API_KEY
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -64,12 +65,6 @@ jobs:
       - name: Run cloud-experimental E2E test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          # Non-interactive install (expect-driven install is optional). expect is installed for Phase 5e TUI.
-          RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL: "0"
-          NEMOCLAW_NON_INTERACTIVE: "1"
-          NEMOCLAW_RECREATE_SANDBOX: "1"
-          NEMOCLAW_POLICY_MODE: "custom"
-          NEMOCLAW_POLICY_PRESETS: "npm,pypi"
           GITHUB_TOKEN: ${{ github.token }}
         run: bash test/e2e/test-e2e-cloud-experimental.sh
 
