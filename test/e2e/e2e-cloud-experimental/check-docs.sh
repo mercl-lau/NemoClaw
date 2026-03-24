@@ -160,8 +160,9 @@ run_cli_check() {
   log "[cli] phase 1: extracted ${_n_help} unique command line(s) from --help"
 
   log '[cli] phase 2/2: extract ### `nemoclaw …` headings from commands reference'
+  # Allow optional MyST suffix on the same line, e.g. ### `nemoclaw onboard` {#anchor}
   grep -E '^### `nemoclaw ' "$COMMANDS_MD" | perl -CS -ne '
-    if (/^### `([^`]+)`\s*$/) { print "$1\n"; }
+    if (/^### `([^`]+)`\s*(?:\{[^}]+\})?\s*$/) { print "$1\n"; }
   ' | LC_ALL=C sort -u >"$_tmp/doc.txt"
 
   local _n_doc

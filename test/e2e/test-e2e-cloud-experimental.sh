@@ -7,7 +7,8 @@
 # Focus: experimental / policy / network / security (VDR3 + internal bugs).
 # Implemented: Phase 0–1, 3, 5–6. Phase 5 runs checks/*.sh; Phase 5b live chat; Phase 5c skill smoke; Phase 5d skill agent verification; Phase 5f check-docs.sh;
 # Phase 5e openclaw TUI smoke (expect, non-interactive); Phase 5f check-docs.sh; Phase 6 final cleanup.
-# Phase 3 alternate: RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 (expect onboard, same as former expect-interactive-install.sh).
+# Phase 3 default: expect-driven interactive curl|bash (RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1).
+#   Set RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=0 for non-interactive install (NEMOCLAW_NON_INTERACTIVE=1, no expect).
 # (add checks under e2e-cloud-experimental/checks without editing case loop). VDR3 #12 via env on Phase 3 install.
 # Phase 2 skipped. Phase 5: checks suite (checks/*.sh only; opt-in scripts live under e2e-cloud-experimental/skip/).
 # Phase 5b: POST /v1/chat/completions inside sandbox (model = CLOUD_EXPERIMENTAL_MODEL); retries on transient gateway/upstream failures.
@@ -36,7 +37,8 @@
 #   NEMOCLAW_POLICY_MODE=custom
 #   NEMOCLAW_POLICY_PRESETS            — e.g. npm,pypi (github preset TBD in repo)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE=1 — optional: expect-based steps (later phases)
-#   RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 — Phase 3 uses expect to drive interactive onboard (not NEMOCLAW_NON_INTERACTIVE)
+#   RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL — default 1: Phase 3 uses expect to drive interactive onboard.
+#     Set to 0 for non-interactive curl|bash (requires NEMOCLAW_NON_INTERACTIVE=1 in host env; no expect on PATH).
 #   INTERACTIVE_SANDBOX_NAME / INTERACTIVE_RECREATE_ANSWER / INTERACTIVE_INFERENCE_SEND / INTERACTIVE_MODEL_SEND / INTERACTIVE_PRESETS_SEND — see Phase 3 expect branch
 #   DEMO_FAKE_ONLY=1 — expect-only smoke, exit before Phase 0 (offline)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_TUI=0 — skip Phase 5e (openclaw tui expect smoke)
@@ -54,11 +56,13 @@
 #   NEMOCLAW_INSTALL_SCRIPT_URL — optional override for Phase 3 curl URL (default: https://www.nvidia.com/nemoclaw.sh)
 #   E2E_PHASE_5B_MAX_ATTEMPTS — Phase 5b chat retries (default: 3); set to 1 to disable retry
 #   E2E_PHASE_5B_RETRY_SLEEP_SEC — seconds between Phase 5b attempts (default: 15)
+#   E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG — Phase 3 install log path (default: /tmp/nemoclaw-e2e-cloud-experimental-install.log)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_CHECK_DOCS=1 — skip Phase 5f (check-docs.sh)
 #   CHECK_DOC_LINKS_REMOTE=0 — Phase 5f: skip curling http(s) doc links only (default in check-docs.sh: remote checks on)
 #
 # Usage (Phases 0–1, 3 + cases + Phase 5b–5f + Phase 6 cleanup; Phase 2 skipped):
-#   NEMOCLAW_NON_INTERACTIVE=1 NVIDIA_API_KEY=nvapi-... bash test/e2e/test-e2e-cloud-experimental.sh
+#   NVIDIA_API_KEY=nvapi-... bash test/e2e/test-e2e-cloud-experimental.sh
+#   Non-interactive install (no expect): RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=0 NEMOCLAW_NON_INTERACTIVE=1 NVIDIA_API_KEY=nvapi-... bash ...
 #
 # Validate only (existing sandbox; no install, no Phase 0/6 teardown):
 #   RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5=1 NVIDIA_API_KEY=nvapi-... bash test/e2e/test-e2e-cloud-experimental.sh
@@ -67,9 +71,9 @@
 # Phase 3 uses the public installer: curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
 # (env below is exported before that run). Checkout root is still required for Phase 5c repo skills.
 #
-# Optional Phase 3b: RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 — same curl|bash but onboard is
-# interactive; expect answers prompts (inlined from e2e-cloud-experimental/expect-interactive-install.sh).
-# Requires expect; do not set NEMOCLAW_NON_INTERACTIVE=1 for the outer shell (Phase 1 allows that).
+# Phase 3 (default): expect answers onboard prompts (inlined from e2e-cloud-experimental/expect-interactive-install.sh).
+# Requires expect on PATH unless RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=0.
+# Phase 1 does not require NEMOCLAW_NON_INTERACTIVE when interactive install is enabled (default).
 # DEMO_FAKE_ONLY=1 — run only a tiny expect self-test, then exit 0 (no install, no Phase 0+).
 
 set -uo pipefail
@@ -132,7 +136,7 @@ CLOUD_EXPERIMENTAL_MODEL="${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENAR
 E2E_DIR="$(cd "$(dirname "$0")" && pwd)"
 E2E_CLOUD_EXPERIMENTAL_READY_DIR="${E2E_DIR}/e2e-cloud-experimental/checks"
 
-if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-0}" = "1" ]; then
+if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-1}" = "1" ]; then
   SANDBOX_NAME="${INTERACTIVE_SANDBOX_NAME:-e2e-cloud-experimental}"
 else
   SANDBOX_NAME="e2e-cloud-experimental"
@@ -192,7 +196,7 @@ else
   info "Destroying leftover sandbox, forwards, and gateway for '${SANDBOX_NAME}'..."
 
   if command -v nemoclaw >/dev/null 2>&1; then
-    nemoclaw "$SANDBOX_NAME" destroy 2>/dev/null || true
+    nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
   fi
   if command -v openshell >/dev/null 2>&1; then
     openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
@@ -233,10 +237,10 @@ fi
 
 if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5:-0}" = "1" ]; then
   pass "Phase 1: FROM_PHASE5 mode (NEMOCLAW_NON_INTERACTIVE not required)"
-elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-0}" = "1" ]; then
+elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-1}" = "1" ]; then
   pass "Phase 1: interactive install mode (NEMOCLAW_NON_INTERACTIVE not required on host)"
 elif [ "${NEMOCLAW_NON_INTERACTIVE:-}" != "1" ]; then
-  fail "NEMOCLAW_NON_INTERACTIVE=1 is required for automated e2e-cloud-experimental segments (or set RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 or RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5=1)"
+  fail "NEMOCLAW_NON_INTERACTIVE=1 is required when RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=0 (or use default interactive install, or RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5=1)"
   exit 1
 else
   pass "NEMOCLAW_NON_INTERACTIVE=1"
@@ -285,14 +289,15 @@ export NEMOCLAW_POLICY_PRESETS="${NEMOCLAW_POLICY_PRESETS:-npm,pypi}"
 NEMOCLAW_INSTALL_SCRIPT_URL="${NEMOCLAW_INSTALL_SCRIPT_URL:-https://www.nvidia.com/nemoclaw.sh}"
 export NEMOCLAW_INSTALL_SCRIPT_URL
 
-INSTALL_LOG="/tmp/nemoclaw-e2e-cloud-experimental-install.log"
+# Override when running in Docker CI with a host-mounted log dir (see test/e2e/Dockerfile.cloud-experimental).
+INSTALL_LOG="${E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG:-/tmp/nemoclaw-e2e-cloud-experimental-install.log}"
 
 if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5:-0}" = "1" ]; then
   info "Phase 3: skipping curl|bash install (RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5=1)"
   install_exit=0
-elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-0}" = "1" ]; then
+elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-1}" = "1" ]; then
   if ! command -v expect >/dev/null 2>&1; then
-    fail "Phase 3: expect not on PATH (required for RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1)"
+    fail "Phase 3: expect not on PATH (install expect, or set RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=0 for non-interactive install)"
     exit 1
   fi
   export INTERACTIVE_SANDBOX_NAME="${INTERACTIVE_SANDBOX_NAME:-$SANDBOX_NAME}"
@@ -411,13 +416,13 @@ fi
 if [ "$install_exit" -eq 0 ]; then
   if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5:-0}" = "1" ]; then
     pass "Phase 3: install skipped (FROM_PHASE5); using existing sandbox '${SANDBOX_NAME}'"
-  elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-0}" = "1" ]; then
+  elif [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-1}" = "1" ]; then
     pass "public install (expect interactive curl|bash) completed (exit 0)"
   else
     pass "public install (curl nemoclaw.sh | bash) completed (exit 0)"
   fi
 else
-  if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-0}" = "1" ]; then
+  if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL:-1}" = "1" ]; then
     fail "public install (expect interactive curl|bash) failed (exit $install_exit)"
   else
     fail "public install (curl nemoclaw.sh | bash) failed (exit $install_exit)"
@@ -810,7 +815,8 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # Phase 6: Final cleanup (mirror Phase 0; leave machine tidy after E2E)
 # ══════════════════════════════════════════════════════════════════════
-# nemoclaw destroy clears registry; openshell sandbox delete + forward stop + gateway destroy.
+# nemoclaw destroy --yes clears registry without [y/N] prompt (otherwise Cancelled. leaves a stale list entry).
+# openshell sandbox delete + forward stop + gateway destroy.
 section "Phase 6: Final cleanup"
 
 if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5:-0}" = "1" ] && [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5_RUN_CLEANUP:-0}" != "1" ]; then
@@ -821,7 +827,7 @@ else
   info "Removing sandbox '${SANDBOX_NAME}', port forward, and nemoclaw gateway..."
 
   if command -v nemoclaw >/dev/null 2>&1; then
-    nemoclaw "$SANDBOX_NAME" destroy 2>/dev/null || true
+    nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
   fi
   if command -v openshell >/dev/null 2>&1; then
     openshell sandbox delete "$SANDBOX_NAME" 2>/dev/null || true
