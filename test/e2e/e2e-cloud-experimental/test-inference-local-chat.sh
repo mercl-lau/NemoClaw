@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # Demo: POST /v1/chat/completions to https://inference.local from *inside* the sandbox (SSH).
 # Same idea as test-e2e-cloud-experimental.sh Phase 5b — use this to verify dialogue without the full suite.
 #
@@ -25,7 +28,10 @@ SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 CLOUD_EXPERIMENTAL_MODEL="${CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}}"
 CHAT_USER_MESSAGE="${CHAT_USER_MESSAGE:-Reply with exactly one word: PONG}"
 
-die() { printf '\033[31m[demo-chat] FAIL:\033[0m %s\n' "$*" >&2; exit 1; }
+die() {
+  printf '\033[31m[demo-chat] FAIL:\033[0m %s\n' "$*" >&2
+  exit 1
+}
 ok() { printf '\033[32m[demo-chat] OK:\033[0m %s\n' "$*"; }
 
 DEMO_CHAT_MAX_DISPLAY_CHARS="${DEMO_CHAT_MAX_DISPLAY_CHARS:-12000}"
@@ -64,8 +70,8 @@ printf '[demo-chat] sandbox=%s\n' "$SANDBOX_NAME"
 
 payload=$(
   CLOUD_EXPERIMENTAL_MODEL="$CLOUD_EXPERIMENTAL_MODEL" \
-  CHAT_USER_MESSAGE="$CHAT_USER_MESSAGE" \
-  python3 -c "
+    CHAT_USER_MESSAGE="$CHAT_USER_MESSAGE" \
+    python3 -c "
 import json, os
 print(json.dumps({
     'model': os.environ['CLOUD_EXPERIMENTAL_MODEL'],
@@ -103,7 +109,7 @@ out=$(
     -o LogLevel=ERROR \
     "openshell-${SANDBOX_NAME}" \
     "curl -sS --max-time 90 https://inference.local/v1/chat/completions -H 'Content-Type: application/json' -d $(printf '%q' "$payload")" \
-  2>&1
+    2>&1
 )
 rc=$?
 set -e
