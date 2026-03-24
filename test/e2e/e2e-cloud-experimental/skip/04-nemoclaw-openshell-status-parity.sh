@@ -99,6 +99,8 @@ nm_rc=$?
 set -e
 [ "$nm_rc" -eq 0 ] || die "nemoclaw list failed (exit $nm_rc): ${nm_list:0:240}"
 
+# shellcheck disable=SC2016
+# JavaScript source for node -e; single quotes intentional
 nm_model=$(printf '%s' "$nm_list" | node -e '
 const name = process.env.SANDBOX_NAME;
 let d = "";
