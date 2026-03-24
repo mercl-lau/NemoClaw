@@ -36,9 +36,14 @@ SKILL_DESCRIPTION="${SKILL_DESCRIPTION:-$DEFAULT_SKILL_DESCRIPTION}"
 SKILL_BODY="${SKILL_BODY:-}"
 SKILL_FILE="${SKILL_FILE:-}"
 SKILL_TEMPLATE_FILE="${SKILL_TEMPLATE_FILE:-${SCRIPT_DIR}/fixtures/skill-smoke-template.SKILL.md}"
+# NemoClaw state lives under /sandbox/.openclaw; OpenClaw CLI inside the sandbox uses ~/.openclaw
+# (typically /home/sandbox/.openclaw). Deploy to both so `openclaw agent` can read managed skills.
 SKILL_ROOT="${SKILL_ROOT:-/sandbox/.openclaw/skills}"
 
-die() { printf '%s\n' "add-sandbox-skill: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "add-sandbox-skill: FAIL: $*" >&2
+  exit 1
+}
 ok() { printf '%s\n' "add-sandbox-skill: OK: $*"; }
 info() { printf '%s\n' "add-sandbox-skill: INFO: $*"; }
 
@@ -70,7 +75,7 @@ tpl = Path(os.environ["SKILL_TEMPLATE_FILE"]).read_text(encoding="utf-8")
 tpl = tpl.replace("__SKILL_ID__", os.environ["SKILL_ID"])
 tpl = tpl.replace("__SKILL_DESCRIPTION__", os.environ["SKILL_DESCRIPTION"])
 print(tpl, end="")
-' > "$payload_source"
+' >"$payload_source"
   else
     {
       printf '%s\n' "---"
@@ -79,7 +84,7 @@ print(tpl, end="")
       printf '%s\n' "---"
       printf '\n'
       printf '%s\n' "$SKILL_BODY"
-    } > "$payload_source"
+    } >"$payload_source"
   fi
 fi
 
@@ -88,7 +93,7 @@ remote_script="$(mktemp)"
 trap 'rm -f "${cleanup_payload:-}" "$ssh_config" "$remote_script"' EXIT
 
 command -v openshell >/dev/null 2>&1 || die "openshell not on PATH"
-openshell sandbox ssh-config "$SANDBOX_NAME" > "$ssh_config" 2>/dev/null \
+openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config" 2>/dev/null \
   || die "openshell sandbox ssh-config failed for '${SANDBOX_NAME}'"
 
 remote_skill_dir="${SKILL_ROOT%/}/${SKILL_ID}"
@@ -103,13 +108,13 @@ upload_out=$(
     -o ConnectTimeout=10 \
     -o LogLevel=ERROR \
     "openshell-${SANDBOX_NAME}" \
-    "cat > '/tmp/${SKILL_ID}.md'" < "$payload_source" 2>&1
+    "cat > '/tmp/${SKILL_ID}.md'" <"$payload_source" 2>&1
 )
 upload_rc=$?
 set -e
 [ "$upload_rc" -eq 0 ] || die "ssh payload upload failed (exit ${upload_rc}): ${upload_out:0:300}"
 
-cat > "$remote_script" <<'EOF'
+cat >"$remote_script" <<'EOF'
 set -e
 skill_dir="$1"
 skill_file="$2"
@@ -117,6 +122,15 @@ temp_file="$3"
 
 mkdir -p "$skill_dir"
 cp "$temp_file" "$skill_file"
+
+# Mirror into $HOME/.openclaw/skills so OpenClaw tools resolve the same SKILL.md (see agent ENOENT on /home/sandbox/.openclaw/skills/...).
+skill_id="$(basename "$skill_dir")"
+home_root="${HOME:-/home/sandbox}"
+home_skill_dir="${home_root}/.openclaw/skills/${skill_id}"
+home_skill_file="${home_skill_dir}/SKILL.md"
+mkdir -p "$home_skill_dir"
+cp "$temp_file" "$home_skill_file"
+
 rm -f "$temp_file"
 
 if [ ! -f "$skill_file" ]; then
@@ -132,6 +146,7 @@ else
 fi
 
 echo "QUERY_PATH=$skill_file"
+echo "HOME_QUERY_PATH=$home_skill_file"
 echo "QUERY_HEAD_BEGIN"
 sed -n '1,20p' "$skill_file"
 echo "QUERY_HEAD_END"
@@ -149,13 +164,14 @@ query_out=$(
     -o ConnectTimeout=10 \
     -o LogLevel=ERROR \
     "openshell-${SANDBOX_NAME}" \
-    "sh -s -- '$remote_skill_dir' '$remote_skill_file' '/tmp/${SKILL_ID}.md'" < "$remote_script" 2>&1
+    "sh -s -- '$remote_skill_dir' '$remote_skill_file' '/tmp/${SKILL_ID}.md'" <"$remote_script" 2>&1
 )
 query_rc=$?
 set -e
 
 [ "$query_rc" -eq 0 ] || die "remote add/query failed (exit ${query_rc}): ${query_out:0:300}"
 echo "$query_out" | grep -q "QUERY_PATH=${remote_skill_file}" || die "did not find query path marker"
+echo "$query_out" | grep -q "HOME_QUERY_PATH=" || die "did not find HOME_QUERY_PATH marker"
 
 ok "skill added and queryable at ${remote_skill_file}"
 printf '%s\n' "$query_out"

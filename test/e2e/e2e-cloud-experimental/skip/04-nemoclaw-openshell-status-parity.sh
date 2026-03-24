@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # Case: nemoclaw registry / CLI view matches OpenShell JSON (bug 5982550).
 #
 # Sandbox “running” signal (OpenShell versions differ):
@@ -16,7 +19,10 @@ SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 CLOUD_EXPERIMENTAL_MODEL="${CLOUD_EXPERIMENTAL_MODEL:-${SCENARIO_A_MODEL:-${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}}}"
 export SANDBOX_NAME
 
-die() { printf '%s\n' "04-nemoclaw-openshell-status-parity: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "04-nemoclaw-openshell-status-parity: FAIL: $*" >&2
+  exit 1
+}
 
 command -v node >/dev/null 2>&1 || die "node not on PATH (needed to parse --json and nemoclaw list)"
 
@@ -76,13 +82,14 @@ if [ -z "$os_model" ]; then
   set -e
   [ "$inf_rc" -eq 0 ] || die "openshell inference get failed (exit $inf_rc): ${inf_raw:0:240}"
   echo "$inf_raw" | grep -qi "nvidia-nim" \
-    || die "openshell inference get (text) missing nvidia-nim provider"
-  echo "$inf_raw" | grep -Fq "$CLOUD_EXPERIMENTAL_MODEL" \
-    || die "openshell inference get (text) missing model '${CLOUD_EXPERIMENTAL_MODEL}'"
+    || die "openshell inference get (text) missing nvidia-nim. Output (first 500 chars): ${inf_raw:0:500}"
+  if ! echo "$inf_raw" | grep -Fq "$CLOUD_EXPERIMENTAL_MODEL"; then
+    die "inference model (text path): expected substring '${CLOUD_EXPERIMENTAL_MODEL}' in 'openshell inference get' (set NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL to match onboarded model). --- output (first 800 chars) --- ${inf_raw:0:800}"
+  fi
   os_model="$CLOUD_EXPERIMENTAL_MODEL"
 else
   [ "$os_model" = "$CLOUD_EXPERIMENTAL_MODEL" ] \
-    || die "inference model mismatch: openshell JSON has '${os_model}', expected '${CLOUD_EXPERIMENTAL_MODEL}'"
+    || die "inference model mismatch: openshell inference get --json .model is '${os_model}', expected '${CLOUD_EXPERIMENTAL_MODEL}' (align CLOUD_EXPERIMENTAL_MODEL / NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL with gateway)"
 fi
 
 # ── NemoClaw: list output must agree with OpenShell inference model ──
