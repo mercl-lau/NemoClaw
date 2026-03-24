@@ -13,7 +13,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 pass() { echo -e "${GREEN}PASS${NC}: $1"; }
-fail() { echo -e "${RED}FAIL${NC}: $1"; exit 1; }
+fail() {
+  echo -e "${RED}FAIL${NC}: $1"
+  exit 1
+}
 info() { echo -e "${YELLOW}TEST${NC}: $1"; }
 
 # -------------------------------------------------------
@@ -25,12 +28,12 @@ openclaw --version && pass "OpenClaw CLI installed" || fail "OpenClaw CLI not fo
 info "2. Verify plugin can be installed"
 # -------------------------------------------------------
 openclaw plugins install /opt/nemoclaw 2>&1 && pass "Plugin installed" || {
-    # If plugins install isn't available, verify the built artifacts exist
-    if [ -f /opt/nemoclaw/dist/index.js ]; then
-        pass "Plugin built successfully (dist/index.js exists)"
-    else
-        fail "Plugin build artifacts missing"
-    fi
+  # If plugins install isn't available, verify the built artifacts exist
+  if [ -f /opt/nemoclaw/dist/index.js ]; then
+    pass "Plugin built successfully (dist/index.js exists)"
+  else
+    fail "Plugin build artifacts missing"
+  fi
 }
 
 # -------------------------------------------------------
@@ -42,10 +45,11 @@ bp = yaml.safe_load(open('/opt/nemoclaw-blueprint/blueprint.yaml'))
 assert bp['version'] == '0.1.0', f'Bad version: {bp[\"version\"]}'
 profiles = bp['components']['inference']['profiles']
 assert 'default' in profiles, 'Missing default profile'
+assert 'ncp' in profiles, 'Missing ncp profile'
 assert 'vllm' in profiles, 'Missing vllm profile'
 assert 'nim-local' in profiles, 'Missing nim-local profile'
 print(f'Profiles: {list(profiles.keys())}')
-" && pass "Blueprint YAML valid with all 3 profiles" || fail "Blueprint YAML invalid"
+" && pass "Blueprint YAML valid with all 4 profiles" || fail "Blueprint YAML invalid"
 
 # -------------------------------------------------------
 info "4. Verify blueprint runner plan command"
