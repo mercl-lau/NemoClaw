@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Validate Cursor/agent skills under .agents/skills/<id>/SKILL.md (YAML frontmatter + body).
-# Bash-only counterpart to the former validate_repo_skills.sh.
+# Bash-only counterpart to the former validate_repo_skills.py.
 
 set -euo pipefail
 
