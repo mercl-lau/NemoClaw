@@ -6,9 +6,8 @@
 #
 # Prereq: repo checkout at cwd or run from repo; NVIDIA_API_KEY for cloud onboard unless creds on disk.
 #
-# Usage (full suite with interactive Phase 3):
-#   RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 NVIDIA_API_KEY=nvapi-... \
-#     bash test/e2e/e2e-cloud-experimental/expect-interactive-install.sh
+# Usage (full suite; Phase 3 is interactive by default in test-e2e-cloud-experimental.sh — this wrapper is optional):
+#   NVIDIA_API_KEY=nvapi-... bash test/e2e/e2e-cloud-experimental/expect-interactive-install.sh
 #
 # Offline expect-only smoke:
 #   DEMO_FAKE_ONLY=1 bash test/e2e/e2e-cloud-experimental/expect-interactive-install.sh
@@ -25,5 +24,5 @@ if [[ "${DEMO_FAKE_ONLY:-0}" == "1" ]]; then
   exec bash test/e2e/test-e2e-cloud-experimental.sh
 fi
 
-export RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1
+export RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL=1 # redundant with script default; keeps intent explicit
 exec bash test/e2e/test-e2e-cloud-experimental.sh

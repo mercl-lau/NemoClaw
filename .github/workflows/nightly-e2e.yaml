@@ -59,6 +59,8 @@ jobs:
       - name: Run cloud-experimental E2E test
         env:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          # Script defaults to expect-driven install; CI uses non-interactive curl|bash (no expect on runner).
+          RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL: "0"
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_RECREATE_SANDBOX: "1"
           NEMOCLAW_POLICY_MODE: "custom"
