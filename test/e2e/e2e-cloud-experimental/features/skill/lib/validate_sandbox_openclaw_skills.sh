@@ -16,17 +16,20 @@ set -euo pipefail
 
 SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 
-die() { printf '%s\n' "validate_sandbox_openclaw_skills: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "validate_sandbox_openclaw_skills: FAIL: $*" >&2
+  exit 1
+}
 
 ssh_config="$(mktemp)"
 trap 'rm -f "$ssh_config"' EXIT
 
-openshell sandbox ssh-config "$SANDBOX_NAME" > "$ssh_config" 2>/dev/null \
+openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config" 2>/dev/null \
   || die "openshell sandbox ssh-config failed for '${SANDBOX_NAME}'"
 
 TIMEOUT_CMD=""
-command -v timeout > /dev/null 2>&1 && TIMEOUT_CMD="timeout 60"
-command -v gtimeout > /dev/null 2>&1 && TIMEOUT_CMD="gtimeout 60"
+command -v timeout >/dev/null 2>&1 && TIMEOUT_CMD="timeout 60"
+command -v gtimeout >/dev/null 2>&1 && TIMEOUT_CMD="gtimeout 60"
 
 ssh_host="openshell-${SANDBOX_NAME}"
 remote='set -e
@@ -55,7 +58,13 @@ out="$(echo "$out" | tr -d '\r' | tail -n 5)"
 case "$out" in
   *MISSING_STATE_DIR*) die "/sandbox/.openclaw missing inside sandbox" ;;
   *MISSING_CONFIG*) die "/sandbox/.openclaw/openclaw.json missing inside sandbox" ;;
-  *SKILLS_SUBDIR=present*) printf '%s\n' "$out"; exit 0 ;;
-  *SKILLS_SUBDIR=absent*) printf '%s\n' "$out"; exit 0 ;;
+  *SKILLS_SUBDIR=present*)
+    printf '%s\n' "$out"
+    exit 0
+    ;;
+  *SKILLS_SUBDIR=absent*)
+    printf '%s\n' "$out"
+    exit 0
+    ;;
   *) die "unexpected remote output: ${out:0:200}" ;;
 esac

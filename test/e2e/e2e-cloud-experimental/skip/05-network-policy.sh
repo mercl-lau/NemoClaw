@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # Case: network policy — declared YAML (VDR3 #6) + enforced egress inside sandbox (VDR3 #15).
 #
 # A) Host: openshell policy get --full — Version header, network_policies, npm/pypi hosts
@@ -11,17 +14,20 @@ set -euo pipefail
 SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 BLOCKED_URL="${E2E_CLOUD_EXPERIMENTAL_EGRESS_BLOCKED_URL:-${SCENARIO_A_EGRESS_BLOCKED_URL:-https://example.com/}}"
 
-die() { printf '%s\n' "05-network-policy: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "05-network-policy: FAIL: $*" >&2
+  exit 1
+}
 
 curl_exit_hint() {
   case "${1:-}" in
-    6)  printf '%s' "curl 6 = could not resolve host (DNS)." ;;
-    7)  printf '%s' "curl 7 = failed to connect (blocked by policy, down, or wrong port)." ;;
+    6) printf '%s' "curl 6 = could not resolve host (DNS)." ;;
+    7) printf '%s' "curl 7 = failed to connect (blocked by policy, down, or wrong port)." ;;
     28) printf '%s' "curl 28 = operation timed out (often policy drop or slow path)." ;;
     35) printf '%s' "curl 35 = SSL connect error." ;;
     56) printf '%s' "curl 56 = network receive error (TLS reset, proxy/gateway closed connection, etc.)." ;;
     60) printf '%s' "curl 60 = peer certificate cannot be authenticated." ;;
-    *)  printf '%s' "curl exit $1 — see \`man curl\` EXIT CODES." ;;
+    *) printf '%s' "curl exit $1 — see \`man curl\` EXIT CODES." ;;
   esac
 }
 
@@ -57,12 +63,12 @@ wl_log="$(mktemp)"
 bl_log="$(mktemp)"
 trap 'rm -f "$ssh_config" "$wl_log" "$bl_log"' EXIT
 
-openshell sandbox ssh-config "$SANDBOX_NAME" > "$ssh_config" 2>/dev/null \
+openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config" 2>/dev/null \
   || die "egress: openshell sandbox ssh-config failed for '${SANDBOX_NAME}'"
 
 TIMEOUT_CMD=""
-command -v timeout > /dev/null 2>&1 && TIMEOUT_CMD="timeout 120"
-command -v gtimeout > /dev/null 2>&1 && TIMEOUT_CMD="gtimeout 120"
+command -v timeout >/dev/null 2>&1 && TIMEOUT_CMD="timeout 120"
+command -v gtimeout >/dev/null 2>&1 && TIMEOUT_CMD="gtimeout 120"
 
 ssh_host="openshell-${SANDBOX_NAME}"
 ssh_base=(ssh -F "$ssh_config"
