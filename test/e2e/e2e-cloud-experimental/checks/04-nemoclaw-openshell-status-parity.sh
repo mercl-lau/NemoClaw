@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # Case: nemoclaw registry / CLI view matches OpenShell JSON (bug 5982550).
 #
 # Sandbox “running” signal (OpenShell versions differ):
@@ -16,7 +19,10 @@ SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 CLOUD_EXPERIMENTAL_MODEL="${CLOUD_EXPERIMENTAL_MODEL:-${SCENARIO_A_MODEL:-${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}}}"
 export SANDBOX_NAME
 
-die() { printf '%s\n' "04-nemoclaw-openshell-status-parity: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "04-nemoclaw-openshell-status-parity: FAIL: $*" >&2
+  exit 1
+}
 
 command -v node >/dev/null 2>&1 || die "node not on PATH (needed to parse --json and nemoclaw list)"
 

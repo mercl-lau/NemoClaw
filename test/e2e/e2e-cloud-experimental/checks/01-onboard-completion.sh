@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # Check 01: onboard completion baseline (post-install smoke gate).
 #
 # Scenario:
@@ -30,7 +33,10 @@ set -euo pipefail
 
 SANDBOX_NAME="${SANDBOX_NAME:-${NEMOCLAW_SANDBOX_NAME:-e2e-cloud-experimental}}"
 CLOUD_EXPERIMENTAL_MODEL="${CLOUD_EXPERIMENTAL_MODEL:-${SCENARIO_A_MODEL:-${NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL:-${NEMOCLAW_SCENARIO_A_MODEL:-moonshotai/kimi-k2.5}}}}"
-die() { printf '%s\n' "01-onboard-completion: FAIL: $*" >&2; exit 1; }
+die() {
+  printf '%s\n' "01-onboard-completion: FAIL: $*" >&2
+  exit 1
+}
 
 set +e
 nm_help=$(nemoclaw --help 2>&1)
@@ -59,8 +65,8 @@ set -e
 [ "$st" -eq 0 ] || die "nemoclaw ${SANDBOX_NAME} status failed (exit $st): ${status_output:0:200}"
 
 CONNECT_TIMEOUT_CMD=""
-command -v timeout > /dev/null 2>&1 && CONNECT_TIMEOUT_CMD="timeout 30"
-command -v gtimeout > /dev/null 2>&1 && CONNECT_TIMEOUT_CMD="gtimeout 30"
+command -v timeout >/dev/null 2>&1 && CONNECT_TIMEOUT_CMD="timeout 30"
+command -v gtimeout >/dev/null 2>&1 && CONNECT_TIMEOUT_CMD="gtimeout 30"
 
 set +e
 connect_out=$(
@@ -86,7 +92,7 @@ echo "$sb_list" | grep -Fq -- "$SANDBOX_NAME" \
 
 ssh_config="$(mktemp)"
 trap 'rm -f "$ssh_config"' EXIT
-openshell sandbox ssh-config "$SANDBOX_NAME" > "$ssh_config" 2>/dev/null \
+openshell sandbox ssh-config "$SANDBOX_NAME" >"$ssh_config" 2>/dev/null \
   || die "openshell sandbox ssh-config failed for '${SANDBOX_NAME}' (openclaw CLI check)"
 
 set +e
