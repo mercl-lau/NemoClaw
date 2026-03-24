@@ -579,18 +579,13 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 # Phase 5c: Skill smoke (repo Cursor skills + sandbox OpenClaw layout)
 # ══════════════════════════════════════════════════════════════════════
-# Repo: test/e2e/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.py — every .agents/skills/*/SKILL.md
+# Repo: test/e2e/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.sh — every .agents/skills/*/SKILL.md
 # Sandbox: test/e2e/e2e-cloud-experimental/features/skill/lib/validate_sandbox_openclaw_skills.sh — /sandbox/.openclaw + openclaw.json;
 #   skills subdir is optional (migration); absent → honest SKIP (not PASS).
 section "Phase 5c: Skill smoke (repo + sandbox OpenClaw)"
 
-if ! command -v python3 >/dev/null 2>&1; then
-  fail "Phase 5c: python3 not on PATH"
-  exit 1
-fi
-
 info "Validating repo .agents/skills (SKILL.md frontmatter + body)..."
-if ! python3 "$E2E_DIR/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.py" --repo "$REPO"; then
+if ! bash "$E2E_DIR/e2e-cloud-experimental/features/skill/lib/validate_repo_skills.sh" --repo "$REPO"; then
   fail "Phase 5c: repo skill validation failed"
   exit 1
 fi
