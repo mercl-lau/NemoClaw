@@ -82,14 +82,13 @@ if [ -z "$os_model" ]; then
   set -e
   [ "$inf_rc" -eq 0 ] || die "openshell inference get failed (exit $inf_rc): ${inf_raw:0:240}"
   echo "$inf_raw" | grep -qi "nvidia-nim" \
-    || die "openshell inference get (text) missing nvidia-nim. Output (first 500 chars): ${inf_raw:0:500}"
-  if ! echo "$inf_raw" | grep -Fq "$CLOUD_EXPERIMENTAL_MODEL"; then
-    die "inference model (text path): expected substring '${CLOUD_EXPERIMENTAL_MODEL}' in 'openshell inference get' (set NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL to match onboarded model). --- output (first 800 chars) --- ${inf_raw:0:800}"
-  fi
+    || die "openshell inference get (text) missing nvidia-nim provider"
+  echo "$inf_raw" | grep -Fq "$CLOUD_EXPERIMENTAL_MODEL" \
+    || die "openshell inference get (text) missing model '${CLOUD_EXPERIMENTAL_MODEL}'"
   os_model="$CLOUD_EXPERIMENTAL_MODEL"
 else
   [ "$os_model" = "$CLOUD_EXPERIMENTAL_MODEL" ] \
-    || die "inference model mismatch: openshell inference get --json .model is '${os_model}', expected '${CLOUD_EXPERIMENTAL_MODEL}' (align CLOUD_EXPERIMENTAL_MODEL / NEMOCLAW_CLOUD_EXPERIMENTAL_MODEL with gateway)"
+    || die "inference model mismatch: openshell JSON has '${os_model}', expected '${CLOUD_EXPERIMENTAL_MODEL}'"
 fi
 
 # ── NemoClaw: list output must agree with OpenShell inference model ──

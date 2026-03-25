@@ -2,9 +2,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# shellcheck disable=SC2016
-# expect(1) Tcl: $ and {...} are Tcl, not bash expansion
-#
 # OpenClaw TUI flow in one command (local / interactive).
 #
 # Automated CI-style smoke (finite expect, no `interact`) runs as Phase 5e inside:

@@ -135,8 +135,6 @@ run_cli_check() {
   _tmp="$(mktemp -d)"
 
   log "[cli] comparing: NO_COLOR=1 $NODE bin/nemoclaw.js --help"
-  # shellcheck disable=SC2016
-  # log text: backticks are documentation markers, not command substitution
   log '[cli]        vs: docs/reference/commands.md (### `nemoclaw …` headings only)'
   log "[cli] excluded: openshell, /nemoclaw slash, deprecated nemoclaw setup (not in --help)"
 
@@ -161,8 +159,6 @@ run_cli_check() {
   _n_help="$(wc -l <"$_tmp/help.txt" | tr -d " ")"
   log "[cli] phase 1: extracted ${_n_help} unique command line(s) from --help"
 
-  # shellcheck disable=SC2016
-  # log text: backticks are documentation markers, not command substitution
   log '[cli] phase 2/2: extract ### `nemoclaw …` headings from commands reference'
   # Allow optional MyST suffix on the same line, e.g. ### `nemoclaw onboard` {#anchor}
   grep -E '^### `nemoclaw ' "$COMMANDS_MD" | perl -CS -ne '
