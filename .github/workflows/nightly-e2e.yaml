@@ -59,7 +59,6 @@ jobs:
   cloud-experimental-e2e:
     if: github.repository == 'NVIDIA/NemoClaw'
     runs-on: ubuntu-latest
-    environment: NVIDIA_API_KEY
     timeout-minutes: 45
     steps:
       - name: Checkout

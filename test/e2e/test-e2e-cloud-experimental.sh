@@ -56,7 +56,7 @@
 #   NEMOCLAW_INSTALL_SCRIPT_URL — optional override for Phase 3 curl URL (default: https://www.nvidia.com/nemoclaw.sh)
 #   E2E_PHASE_5B_MAX_ATTEMPTS — Phase 5b chat retries (default: 3); set to 1 to disable retry
 #   E2E_PHASE_5B_RETRY_SLEEP_SEC — seconds between Phase 5b attempts (default: 15)
-#   E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG — Phase 3 install log path (default: /tmp/nemoclaw-e2e-cloud-experimental-install.log)
+#   E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG — Phase 3 install log path (default: /tmp/...install.<uid>.log so root vs user runs do not share one file)
 #   RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_CHECK_DOCS=1 — skip Phase 5f (check-docs.sh)
 #   CHECK_DOC_LINKS_REMOTE=0 — Phase 5f: skip curling http(s) doc links only (default in check-docs.sh: remote checks on)
 #
@@ -290,7 +290,7 @@ NEMOCLAW_INSTALL_SCRIPT_URL="${NEMOCLAW_INSTALL_SCRIPT_URL:-https://www.nvidia.c
 export NEMOCLAW_INSTALL_SCRIPT_URL
 
 # Override when running in Docker CI with a host-mounted log dir (see test/e2e/Dockerfile.cloud-experimental).
-INSTALL_LOG="${E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG:-/tmp/nemoclaw-e2e-cloud-experimental-install.log}"
+INSTALL_LOG="${E2E_CLOUD_EXPERIMENTAL_INSTALL_LOG:-/tmp/nemoclaw-e2e-cloud-experimental-install.${UID}.log}"
 
 if [ "${RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5:-0}" = "1" ]; then
   info "Phase 3: skipping curl|bash install (RUN_E2E_CLOUD_EXPERIMENTAL_FROM_PHASE5=1)"
