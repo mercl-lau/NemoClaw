@@ -760,7 +760,8 @@ exit 0
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(429)).toBe(true);
     });
 
-    it("retries 502/503/504 (upstream gateway flakes)", () => {
+    it("retries 500/502/503/504 (upstream service and gateway flakes)", () => {
+      expect(RETRIABLE_HTTP_PROBE_STATUSES.has(500)).toBe(true);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(502)).toBe(true);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(503)).toBe(true);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(504)).toBe(true);
@@ -771,7 +772,6 @@ exit 0
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(401)).toBe(false);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(403)).toBe(false);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(404)).toBe(false);
-      expect(RETRIABLE_HTTP_PROBE_STATUSES.has(500)).toBe(false);
       expect(RETRIABLE_HTTP_PROBE_STATUSES.has(200)).toBe(false);
     });
 
@@ -810,6 +810,115 @@ exit 0
           expect(result).toMatchObject({ ok: true, api: "openai-completions" });
           expect(lines.join("\n")).toContain("HTTP 502");
           expect(fs.readFileSync(counter, "utf8").trim()).toBe("2");
+        },
+      );
+    });
+
+    it("recovers when an upstream 500 clears on retry", () => {
+      const body = `n=$(cat "${HARNESS_COUNTER}")
+n=$((n + 1))
+echo "$n" > "${HARNESS_COUNTER}"
+if [ "$n" -lt 2 ]; then
+  if [ -n "$outfile" ]; then
+    printf '{"error":"temporary upstream failure"}' > "$outfile"
+  fi
+  printf '500'
+  exit 0
+fi
+if [ -n "$outfile" ]; then
+  cat <<'JSON' > "$outfile"
+{"choices":[{"message":{"content":"OK"}}]}
+JSON
+fi
+printf '200'
+exit 0
+`;
+      withFakeCurlProbe(
+        {
+          script: makeFakeCurlScript(body),
+          dirPrefix: "nemoclaw-500-probe-",
+        },
+        ({ lines, counter }) => {
+          const result = probeOpenAiLikeEndpoint(
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvapi-test",
+            { skipResponsesProbe: true },
+          );
+
+          expect(result).toMatchObject({ ok: true, api: "openai-completions" });
+          expect(lines.join("\n")).toContain("HTTP 500");
+          expect(fs.readFileSync(counter, "utf8").trim()).toBe("2");
+        },
+      );
+    });
+
+    it("retries an NVIDIA function-route 404", () => {
+      const body = `n=$(cat "${HARNESS_COUNTER}")
+n=$((n + 1))
+echo "$n" > "${HARNESS_COUNTER}"
+if [ "$n" -lt 2 ]; then
+  if [ -n "$outfile" ]; then
+    cat <<'JSON' > "$outfile"
+{"detail":"Function 'abc': Not found for account 'qa'"}
+JSON
+  fi
+  printf '404'
+  exit 0
+fi
+if [ -n "$outfile" ]; then
+  cat <<'JSON' > "$outfile"
+{"choices":[{"message":{"content":"OK"}}]}
+JSON
+fi
+printf '200'
+exit 0
+`;
+      withFakeCurlProbe(
+        {
+          script: makeFakeCurlScript(body),
+          dirPrefix: "nemoclaw-nvcf-404-probe-",
+        },
+        ({ lines, counter }) => {
+          const result = probeOpenAiLikeEndpoint(
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvapi-test",
+            { skipResponsesProbe: true },
+          );
+
+          expect(result).toMatchObject({ ok: true, api: "openai-completions" });
+          expect(lines.join("\n")).toContain("temporary NVIDIA function-route HTTP 404");
+          expect(fs.readFileSync(counter, "utf8").trim()).toBe("2");
+        },
+      );
+    });
+
+    it("does not retry an ordinary NVIDIA endpoint 404", () => {
+      const body = `n=$(cat "${HARNESS_COUNTER}")
+n=$((n + 1))
+echo "$n" > "${HARNESS_COUNTER}"
+if [ -n "$outfile" ]; then
+  printf '404 page not found' > "$outfile"
+fi
+printf '404'
+exit 0
+`;
+      withFakeCurlProbe(
+        {
+          script: makeFakeCurlScript(body),
+          dirPrefix: "nemoclaw-ordinary-404-probe-",
+        },
+        ({ counter }) => {
+          const result = probeOpenAiLikeEndpoint(
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            "nvapi-test",
+            { skipResponsesProbe: true },
+          );
+
+          expect(result).toMatchObject({ ok: false });
+          expect(fs.readFileSync(counter, "utf8").trim()).toBe("1");
         },
       );
     });

@@ -7,6 +7,7 @@ import {
   createValidationSession,
   type ValidationSessionOptions,
 } from "../adapters/http/validation-session";
+import { isNvcfFunctionNotFoundForAccount } from "../nvcf-errors";
 import { addTraceEvent, withTraceSpan } from "../trace";
 import type { TrustedPrivateEndpointCapability } from "./endpoint-ssrf-preflight";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./openai-probe-models";
 import { STREAMING_EVENT_PROBE_MAX_SECONDS } from "./probe-http-helpers";
 
-const RETRIABLE_HTTP_STATUSES = new Set([429, 502, 503, 504]);
+const RETRIABLE_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
 const RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 
 export interface OpenAiValidationOptions {
@@ -187,6 +188,7 @@ async function requestWithHttpRetry(
   name: string,
   request: () => Promise<CurlProbeResult>,
   retryTransientHttp = true,
+  retryReason?: (result: CurlProbeResult) => string | null,
 ): Promise<CurlProbeResult> {
   let result = await request();
   let attempt = 1;
@@ -197,15 +199,16 @@ async function requestWithHttpRetry(
     curl_status: result.curlStatus,
   });
   for (const delayMs of RETRY_DELAYS_MS) {
+    const customRetryReason = retryReason?.(result) ?? null;
     if (
       !retryTransientHttp ||
       result.curlStatus !== 0 ||
-      !RETRIABLE_HTTP_STATUSES.has(result.httpStatus)
+      (!RETRIABLE_HTTP_STATUSES.has(result.httpStatus) && customRetryReason === null)
     ) {
       break;
     }
     console.log(
-      `  ${name} validation returned HTTP ${result.httpStatus}; retrying in ${Math.round(delayMs / 1000)}s...`,
+      `  ${name} validation ${customRetryReason ?? `returned HTTP ${result.httpStatus}`}; retrying in ${Math.round(delayMs / 1000)}s...`,
     );
     await waitForRetry(delayMs);
     attempt += 1;
@@ -218,6 +221,26 @@ async function requestWithHttpRetry(
     });
   }
   return result;
+}
+
+function nvidiaFunctionRouteRetryReason(
+  endpointUrl: string,
+  result: CurlProbeResult,
+): string | null {
+  if (
+    result.curlStatus !== 0 ||
+    result.httpStatus !== 404 ||
+    (!isNvcfFunctionNotFoundForAccount(result.message) &&
+      !isNvcfFunctionNotFoundForAccount(result.body))
+  ) {
+    return null;
+  }
+  try {
+    if (new URL(endpointUrl).hostname !== "integrate.api.nvidia.com") return null;
+  } catch {
+    return null;
+  }
+  return "returned a temporary NVIDIA function-route HTTP 404";
 }
 
 function shouldUseLegacyForModel(model: string): boolean {
@@ -342,6 +365,7 @@ export async function probeOpenAiLikeEndpointWithValidationSession(
                 timeoutMs: deps.getChatTimeoutMs(model, options),
               }),
             retryTransientHttp,
+            (result) => nvidiaFunctionRouteRetryReason(endpointUrl, result),
           );
         const retryReasoningOnly = (candidate: CurlProbeResult) => {
           if (!isReasoningOnlyLengthResponse(candidate.body)) return null;

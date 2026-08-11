@@ -243,6 +243,24 @@ function explainDisabledToolParsing(result) {
   };
 }
 
+function nvidiaFunctionRouteRetryReason(endpointUrl, result) {
+  if (
+    result?.reasoningRetryAttempted === true ||
+    result?.curlStatus !== 0 ||
+    result?.httpStatus !== 404 ||
+    (!isNvcfFunctionNotFoundForAccount(result?.message ?? "") &&
+      !isNvcfFunctionNotFoundForAccount(result?.body ?? ""))
+  ) {
+    return null;
+  }
+  try {
+    if (new URL(endpointUrl).hostname !== "integrate.api.nvidia.com") return null;
+  } catch {
+    return null;
+  }
+  return "returned a temporary NVIDIA function-route HTTP 404";
+}
+
 function shouldRequireResponsesToolCalling(provider) {
   return (
     provider === "nvidia-prod" || provider === "gemini-api" || provider === "compatible-endpoint"
@@ -822,14 +840,18 @@ function probeOpenAiLikeEndpoint(endpointUrl, model, apiKey, options = {}) {
     const chatCompletionsProbe = {
       name: "Chat Completions API",
       api: "openai-completions",
-      retryReason: (result) =>
-        options.retryChatCompletionsToolReadiness === true &&
-        result.reasoningRetryAttempted !== true &&
-        result.curlStatus === 0 &&
-        result.httpStatus === 200 &&
-        result.diagnosticCodes?.includes("openai-chat-missing-structured-tool-call")
-          ? "did not return a structured tool call"
-          : null,
+      retryReason: (result) => {
+        if (
+          options.retryChatCompletionsToolReadiness === true &&
+          result.reasoningRetryAttempted !== true &&
+          result.curlStatus === 0 &&
+          result.httpStatus === 200 &&
+          result.diagnosticCodes?.includes("openai-chat-missing-structured-tool-call")
+        ) {
+          return "did not return a structured tool call";
+        }
+        return nvidiaFunctionRouteRetryReason(endpointUrl, result);
+      },
 
       execute: () =>
         options.requireChatCompletionsToolCalling === true

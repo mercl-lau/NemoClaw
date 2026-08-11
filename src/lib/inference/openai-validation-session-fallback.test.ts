@@ -23,6 +23,7 @@ describe("OpenAI validation curl fallback", () => {
   it("recovers natively after transient HTTP failures", async () => {
     vi.stubEnv("NEMOCLAW_TEST_NO_SLEEP", "1");
     const responsePlan = [
+      [500, '{"error":{"message":"retry"}}'],
       [503, '{"error":{"message":"retry"}}'],
       [429, '{"error":{"message":"retry"}}'],
       [200, '{"choices":[{"message":{"content":"OK"}}]}'],
@@ -47,8 +48,72 @@ describe("OpenAI validation curl fallback", () => {
     );
 
     expect(result).toMatchObject({ ok: true, api: "openai-completions" });
-    expect(requests).toBe(3);
+    expect(requests).toBe(4);
     expect(harness.legacyProbe).not.toHaveBeenCalled();
+  });
+
+  it("recovers after a transient NVIDIA function-route 404", async () => {
+    vi.stubEnv("NEMOCLAW_TEST_NO_SLEEP", "1");
+    let requests = 0;
+    const server = http.createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      response.setHeader("content-type", "application/json");
+      if (requests === 1) {
+        response.statusCode = 404;
+        response.end(
+          JSON.stringify({
+            detail:
+              "Function '12345678-1234-1234-1234-123456789abc': Not found for account 'test-account'",
+          }),
+        );
+        return;
+      }
+      response.end('{"choices":[{"message":{"content":"OK"}}]}');
+    });
+    const port = await listen(server);
+    const harness = createOpenAiValidationTestDeps();
+
+    const result = await probeOpenAiLikeEndpointWithValidationSession(
+      `http://integrate.api.nvidia.com:${port}/v1`,
+      "test-model",
+      "test-key",
+      { skipResponsesProbe: true },
+      harness,
+    );
+
+    expect(result).toMatchObject({ ok: true, api: "openai-completions" });
+    expect(requests).toBe(2);
+    expect(harness.legacyProbe).not.toHaveBeenCalled();
+  });
+
+  it("does not retry an ordinary NVIDIA HTTP 404", async () => {
+    vi.stubEnv("NEMOCLAW_TEST_NO_SLEEP", "1");
+    let requests = 0;
+    const server = http.createServer((request, response) => {
+      request.resume();
+      requests += 1;
+      response.statusCode = 404;
+      response.end("404 page not found");
+    });
+    const port = await listen(server);
+    const legacyProbe: OpenAiValidationSessionDeps["legacyProbe"] = vi.fn(() => ({
+      ok: false,
+      message: "ordinary 404 diagnostic",
+    }));
+    const harness = createOpenAiValidationTestDeps(legacyProbe);
+
+    const result = await probeOpenAiLikeEndpointWithValidationSession(
+      `http://integrate.api.nvidia.com:${port}/v1`,
+      "test-model",
+      "test-key",
+      { skipResponsesProbe: true },
+      harness,
+    );
+
+    expect(result).toEqual({ ok: false, message: "ordinary 404 diagnostic" });
+    expect(requests).toBe(1);
+    expect(legacyProbe).toHaveBeenCalledTimes(1);
   });
 
   it("falls back once after transient HTTP retries are exhausted", async () => {
